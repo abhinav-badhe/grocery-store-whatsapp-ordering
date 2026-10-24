@@ -1,0 +1,36 @@
+{
+  "name": "@grocery/database",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Shared PostgreSQL connection pool, Kysely client, transaction helpers, and migration runner",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json && node --input-type=module -e \"import fs from 'node:fs'; if (fs.existsSync('src/migrations')) { fs.cpSync('src/migrations', 'dist/migrations', { recursive: true }); }\"",
+    "typecheck": "tsc --noEmit",
+    "test": "node --experimental-strip-types --test test/**/*.test.ts"
+  },
+  "dependencies": {
+    "@grocery/config": "workspace:*",
+    "@grocery/observability": "workspace:*",
+    "kysely": "^0.27.5",
+    "pg": "^8.13.3",
+    "zod": "^3.24.2"
+  },
+  "devDependencies": {
+    "@grocery/tsconfig": "workspace:*",
+    "@types/node": "^22.13.5",
+    "@types/pg": "^8.11.11"
+  }
+}

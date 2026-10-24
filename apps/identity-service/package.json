@@ -1,0 +1,31 @@
+{
+  "name": "@grocery/identity-service",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Identity, authentication, and access control domain boundary",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc --noEmit",
+    "test": "node --experimental-strip-types --test test/**/*.test.ts",
+    "start": "node dist/index.js"
+  },
+  "dependencies": {
+    "@grocery/api-contracts": "workspace:*",
+    "@grocery/config": "workspace:*",
+    "@grocery/database": "workspace:*",
+    "@grocery/observability": "workspace:*",
+    "@grocery/service-runtime": "workspace:*",
+    "@node-rs/argon2": "^2.2.2",
+    "kysely": "^0.27.5"
+  },
+  "devDependencies": {
+    "@grocery/tsconfig": "workspace:*",
+    "@types/node": "^22.13.5"
+  }
+}

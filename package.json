@@ -1,0 +1,31 @@
+{
+  "name": "grocery-store-monorepo",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Production-grade Grocery Store & WhatsApp Ordering Monorepo",
+  "packageManager": "pnpm@12.6.0",
+  "engines": {
+    "node": ">=20.18.0",
+    "pnpm": ">=12.0.0"
+  },
+  "scripts": {
+    "build": "pnpm -r build",
+    "format:check": "prettier --check README.md \"*.{json,yaml,yml}\" \"{packages,apps}/**/*.{json,yaml,yml,mjs,js,ts}\" \"!pnpm-lock.yaml\"",
+    "format": "prettier --write README.md \"*.{json,yaml,yml}\" \"{packages,apps}/**/*.{json,yaml,yml,mjs,js,ts}\" \"!pnpm-lock.yaml\"",
+    "test": "pnpm -r test"
+  },
+  "devDependencies": {
+    "@types/node": "^22.13.5",
+    "eslint": "^9.21.0",
+    "prettier": "^3.5.3",
+    "typescript": "^5.8.2"
+  },
+  "prettier": {
+    "singleQuote": true,
+    "trailingComma": "all",
+    "tabWidth": 2,
+    "semi": true,
+    "printWidth": 100,
+    "endOfLine": "lf"
+  }
+}

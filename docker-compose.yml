@@ -1,0 +1,86 @@
+# ==============================================================================
+# Grocery Store Monorepo — Local Infrastructure Compose File
+# ==============================================================================
+# STRICT SAFETY INVARIANT:
+# This Docker Compose configuration is STRICTLY for local developer environment use.
+# DO NOT deploy this file to staging or production environments.
+# All ports are strictly bound to loopback (127.0.0.1) to prevent external exposure.
+# Real credentials must never be committed here. Defaults are local-only.
+# ==============================================================================
+
+name: grocerystore-local
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: grocerystore-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-grocerystore}
+    ports:
+      - '127.0.0.1:${POSTGRES_PORT:-5432}:5432'
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test:
+        ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-grocerystore}']
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - local_dev_net
+
+  rabbitmq:
+    image: rabbitmq:3.13-management-alpine
+    container_name: grocerystore-rabbitmq
+    restart: unless-stopped
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_DEFAULT_USER:-grocery_dev}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_DEFAULT_PASS:-grocery_dev_password}
+    ports:
+      - '127.0.0.1:${RABBITMQ_PORT:-5672}:5672'
+      - '127.0.0.1:${RABBITMQ_MANAGEMENT_PORT:-15672}:15672'
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    healthcheck:
+      test: ['CMD', 'rabbitmq-diagnostics', '-q', 'ping']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    networks:
+      - local_dev_net
+
+  redis:
+    image: redis:7-alpine
+    container_name: grocerystore-redis
+    restart: unless-stopped
+    command: ['redis-server', '--appendonly', 'yes']
+    ports:
+      - '127.0.0.1:${REDIS_PORT:-6379}:6379'
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 5s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+    networks:
+      - local_dev_net
+
+volumes:
+  postgres_data:
+    name: grocerystore_postgres_data
+  rabbitmq_data:
+    name: grocerystore_rabbitmq_data
+  redis_data:
+    name: grocerystore_redis_data
+
+networks:
+  local_dev_net:
+    name: grocerystore_local_dev_net
+    driver: bridge

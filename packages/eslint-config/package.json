@@ -1,0 +1,19 @@
+{
+  "name": "@grocery/eslint-config",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Shared ESLint flat configuration for Grocery Store monorepo",
+  "type": "module",
+  "main": "index.mjs",
+  "exports": {
+    ".": "./index.mjs"
+  },
+  "dependencies": {
+    "@eslint/js": "^9.21.0",
+    "eslint-config-prettier": "^10.0.1",
+    "typescript-eslint": "^8.25.0"
+  },
+  "peerDependencies": {
+    "eslint": "^9.0.0"
+  }
+}

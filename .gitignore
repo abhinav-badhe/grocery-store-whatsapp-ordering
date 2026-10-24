@@ -1,0 +1,58 @@
+# Dependencies
+node_modules/
+.pnp/
+.pnp.js
+
+# Build and Compilation Outputs
+dist/
+build/
+out/
+.next/
+.turbo/
+*.tsbuildinfo
+
+# Test Coverage and Reports
+coverage/
+*.lcov
+.nyc_output/
+playwright-report/
+test-results/
+
+# Environment Variables & Secrets (Keep .env.example tracked)
+.env
+.env*.local
+.env.development
+.env.test
+.env.production
+!.env.example
+*.pem
+*.key
+*.cert
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Runtime and Local Database Data
+tmp/
+temp/
+postgres-data/
+rabbitmq-data/
+redis-data/
+*.sqlite
+*.db
+
+# Operating System & IDE Artifacts
+.DS_Store
+Thumbs.db
+desktop.ini
+.idea/
+*.sublime-project
+*.sublime-workspace
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
