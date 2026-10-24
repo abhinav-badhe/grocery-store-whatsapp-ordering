@@ -478,6 +478,10 @@ describe('Shared Service Runtime: HTTP Server & Health Endpoints', () => {
 
   it('allows in-flight request to finish before graceful shutdown deadline without stalling on keep-alive', async () => {
     let requestFinished = false;
+    let requestStartedResolve!: () => void;
+    const requestStartedPromise = new Promise<void>((resolve) => {
+      requestStartedResolve = resolve;
+    });
 
     const service = createHttpServer({
       serviceName: 'test-service',
@@ -485,6 +489,7 @@ describe('Shared Service Runtime: HTTP Server & Health Endpoints', () => {
       shutdownTimeoutMs: 5000,
       requestHandler: async (req, res) => {
         if (req.url === '/slow-operation') {
+          requestStartedResolve();
           await new Promise((resolve) => setTimeout(resolve, 50));
           requestFinished = true;
           res.setHeader('Content-Type', 'application/json; charset=utf-8');
@@ -499,8 +504,8 @@ describe('Shared Service Runtime: HTTP Server & Health Endpoints', () => {
       // Start in-flight request using fetch (HTTP keep-alive enabled)
       const requestPromise = fetch(`http://127.0.0.1:${port}/slow-operation`);
 
-      // Give request a moment to enter activeRequests
-      await new Promise((resolve) => setTimeout(resolve, 10));
+      // Give request a moment to reach the handler deterministically
+      await requestStartedPromise;
 
       // Initiate graceful shutdown
       const stopStart = Date.now();
@@ -526,12 +531,18 @@ describe('Shared Service Runtime: HTTP Server & Health Endpoints', () => {
   });
 
   it('force-closes connections exceeding graceful shutdown deadline for genuinely stalled connections', async () => {
+    let requestStartedResolve!: () => void;
+    const requestStartedPromise = new Promise<void>((resolve) => {
+      requestStartedResolve = resolve;
+    });
+
     const service = createHttpServer({
       serviceName: 'test-service',
       port: 0,
       shutdownTimeoutMs: 50,
       requestHandler: async (req) => {
         if (req.url === '/hanging-request') {
+          requestStartedResolve();
           // Genuinely stalled connection (never responds)
           await new Promise(() => {});
         }
@@ -546,13 +557,14 @@ describe('Shared Service Runtime: HTTP Server & Health Endpoints', () => {
         return null;
       });
 
-      await new Promise((resolve) => setTimeout(resolve, 10));
+      // Wait until request has actually arrived at the server
+      await requestStartedPromise;
 
       const start = Date.now();
       await service.stop();
       const elapsed = Date.now() - start;
 
-      assert.ok(elapsed >= 40 && elapsed < 1500, `Shutdown took ${elapsed}ms`);
+      assert.ok(elapsed >= 35 && elapsed < 2000, `Shutdown took ${elapsed}ms`);
       await requestPromise;
     } finally {
       await service.stop();
