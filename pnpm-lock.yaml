@@ -209,12 +209,18 @@ importers:
       '@grocery/config':
         specifier: workspace:*
         version: link:../../packages/config
+      '@grocery/database':
+        specifier: workspace:*
+        version: link:../../packages/database
       '@grocery/observability':
         specifier: workspace:*
         version: link:../../packages/observability
       '@grocery/service-runtime':
         specifier: workspace:*
         version: link:../../packages/service-runtime
+      kysely:
+        specifier: ^0.27.5
+        version: 0.27.6
     devDependencies:
       '@grocery/tsconfig':
         specifier: workspace:*
@@ -262,12 +268,18 @@ importers:
       '@grocery/config':
         specifier: workspace:*
         version: link:../../packages/config
+      '@grocery/database':
+        specifier: workspace:*
+        version: link:../../packages/database
       '@grocery/observability':
         specifier: workspace:*
         version: link:../../packages/observability
       '@grocery/service-runtime':
         specifier: workspace:*
         version: link:../../packages/service-runtime
+      kysely:
+        specifier: ^0.27.5
+        version: 0.27.6
     devDependencies:
       '@grocery/tsconfig':
         specifier: workspace:*
@@ -281,6 +293,9 @@ importers:
       '@grocery/config':
         specifier: workspace:*
         version: link:../../packages/config
+      '@grocery/database':
+        specifier: workspace:*
+        version: link:../../packages/database
       '@grocery/event-contracts':
         specifier: workspace:*
         version: link:../../packages/event-contracts
@@ -290,6 +305,9 @@ importers:
       '@grocery/service-runtime':
         specifier: workspace:*
         version: link:../../packages/service-runtime
+      kysely:
+        specifier: ^0.27.5
+        version: 0.27.6
     devDependencies:
       '@grocery/tsconfig':
         specifier: workspace:*
@@ -306,12 +324,18 @@ importers:
       '@grocery/config':
         specifier: workspace:*
         version: link:../../packages/config
+      '@grocery/database':
+        specifier: workspace:*
+        version: link:../../packages/database
       '@grocery/observability':
         specifier: workspace:*
         version: link:../../packages/observability
       '@grocery/service-runtime':
         specifier: workspace:*
         version: link:../../packages/service-runtime
+      kysely:
+        specifier: ^0.27.5
+        version: 0.27.6
     devDependencies:
       '@grocery/tsconfig':
         specifier: workspace:*
@@ -328,12 +352,18 @@ importers:
       '@grocery/config':
         specifier: workspace:*
         version: link:../../packages/config
+      '@grocery/database':
+        specifier: workspace:*
+        version: link:../../packages/database
       '@grocery/observability':
         specifier: workspace:*
         version: link:../../packages/observability
       '@grocery/service-runtime':
         specifier: workspace:*
         version: link:../../packages/service-runtime
+      kysely:
+        specifier: ^0.27.5
+        version: 0.27.6
     devDependencies:
       '@grocery/tsconfig':
         specifier: workspace:*
@@ -347,6 +377,9 @@ importers:
       '@grocery/config':
         specifier: workspace:*
         version: link:../../packages/config
+      '@grocery/database':
+        specifier: workspace:*
+        version: link:../../packages/database
       '@grocery/event-contracts':
         specifier: workspace:*
         version: link:../../packages/event-contracts
@@ -356,6 +389,9 @@ importers:
       '@grocery/service-runtime':
         specifier: workspace:*
         version: link:../../packages/service-runtime
+      kysely:
+        specifier: ^0.27.5
+        version: 0.27.6
     devDependencies:
       '@grocery/tsconfig':
         specifier: workspace:*
@@ -369,6 +405,9 @@ importers:
       '@grocery/config':
         specifier: workspace:*
         version: link:../../packages/config
+      '@grocery/database':
+        specifier: workspace:*
+        version: link:../../packages/database
       '@grocery/event-contracts':
         specifier: workspace:*
         version: link:../../packages/event-contracts
@@ -378,6 +417,9 @@ importers:
       '@grocery/service-runtime':
         specifier: workspace:*
         version: link:../../packages/service-runtime
+      kysely:
+        specifier: ^0.27.5
+        version: 0.27.6
     devDependencies:
       '@grocery/tsconfig':
         specifier: workspace:*
@@ -400,6 +442,37 @@ importers:
       '@grocery/service-runtime':
         specifier: workspace:*
         version: link:../../packages/service-runtime
+    devDependencies:
+      '@grocery/tsconfig':
+        specifier: workspace:*
+        version: link:../../packages/tsconfig
+      '@types/node':
+        specifier: ^22.13.5
+        version: 22.20.5
+
+  apps/whatsapp-service:
+    dependencies:
+      '@grocery/api-contracts':
+        specifier: workspace:*
+        version: link:../../packages/api-contracts
+      '@grocery/config':
+        specifier: workspace:*
+        version: link:../../packages/config
+      '@grocery/database':
+        specifier: workspace:*
+        version: link:../../packages/database
+      '@grocery/observability':
+        specifier: workspace:*
+        version: link:../../packages/observability
+      '@grocery/service-runtime':
+        specifier: workspace:*
+        version: link:../../packages/service-runtime
+      kysely:
+        specifier: ^0.27.5
+        version: 0.27.6
+      zod:
+        specifier: ^3.24.2
+        version: 3.25.76
     devDependencies:
       '@grocery/tsconfig':
         specifier: workspace:*

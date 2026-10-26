@@ -1,3 +1,4 @@
+import crypto from 'node:crypto';
 import type { Kysely } from 'kysely';
 import type { Database, UserRow } from '@grocery/database';
 import {
@@ -9,15 +10,34 @@ import {
 import {
   createUserRepository,
   createCredentialRepository,
+  createRefreshTokenRepository,
   createUserWithCredential,
   DuplicateEmailError,
   DuplicatePhoneError,
+  generateRefreshToken,
+  hashRefreshToken,
   type UserRepository,
   type CredentialRepository,
   type RefreshTokenRepository,
 } from '../persistence/index.js';
-import { createPasswordHasher, type PasswordHasher } from '../crypto/index.js';
-import type { AuthService, AuthServiceDependencies, RegisterResult, LoginResult } from './types.js';
+import {
+  createPasswordHasher,
+  signAccessToken,
+  verifyAccessToken,
+  TokenVerificationError,
+  type PasswordHasher,
+} from '../crypto/index.js';
+import type {
+  AuthService,
+  AuthServiceDependencies,
+  AuthSession,
+  AuthSessionKeyPair,
+  RegisterResult,
+  LoginResult,
+  RefreshResult,
+  LogoutResult,
+  CurrentUserResult,
+} from './types.js';
 import {
   ValidationError,
   InvalidCredentialsError,
@@ -25,6 +45,8 @@ import {
   AccountInactiveError,
   RegistrationConflictError,
   TooManyRequestsError,
+  UnauthorizedError,
+  InvalidTokenError,
 } from './errors.js';
 import type { RateLimiter } from './rate-limiter.js';
 
@@ -60,14 +82,75 @@ export class DefaultAuthService implements AuthService {
   private readonly refreshTokenRepo?: RefreshTokenRepository;
   private readonly hasher: PasswordHasher;
   private readonly rateLimiter?: RateLimiter;
+  private readonly keyPair?: AuthSessionKeyPair;
+  private readonly issuer: string;
+  private readonly audience: string;
+  private readonly accessTokenExpiresInSeconds: number;
 
   constructor(deps: AuthServiceDependencies) {
     this.db = deps.db;
     this.userRepo = deps.userRepo ?? createUserRepository(deps.db);
     this.credentialRepo = deps.credentialRepo ?? createCredentialRepository(deps.db);
-    this.refreshTokenRepo = deps.refreshTokenRepo;
+    this.refreshTokenRepo =
+      deps.refreshTokenRepo ?? (deps.db ? createRefreshTokenRepository(deps.db) : undefined);
     this.hasher = deps.hasher ?? createPasswordHasher();
     this.rateLimiter = deps.rateLimiter;
+    this.keyPair = deps.keyPair;
+    this.issuer = deps.issuer ?? 'grocery-identity-service';
+    this.audience = deps.audience ?? 'grocery-api-gateway';
+    this.accessTokenExpiresInSeconds = deps.accessTokenExpiresInSeconds ?? 900;
+  }
+
+  private async issueSession(
+    userId: string,
+    claims: { email?: string | null; phone?: string | null; fullName: string },
+  ): Promise<AuthSession | undefined> {
+    if (!this.keyPair || !this.refreshTokenRepo) {
+      return undefined;
+    }
+
+    const { rawToken, tokenHash } = generateRefreshToken();
+    const familyId = crypto.randomUUID();
+    const now = Date.now();
+    const expiresAt = new Date(now + 7 * 24 * 60 * 60 * 1000); // 7 days idle per ADR-003
+    const familyExpiresAt = new Date(now + 30 * 24 * 60 * 60 * 1000); // 30 days absolute per ADR-003
+
+    const record = await this.refreshTokenRepo.create({
+      user_id: userId,
+      token_hash: tokenHash,
+      family_id: familyId,
+      expires_at: expiresAt,
+      family_expires_at: familyExpiresAt,
+      status: 'ACTIVE',
+    });
+
+    const accessToken = signAccessToken(
+      {
+        sub: userId,
+        email: claims.email,
+        phone: claims.phone,
+        fullName: claims.fullName,
+      },
+      {
+        privateKey: this.keyPair.privateKey,
+        kid: this.keyPair.kid,
+        issuer: this.issuer,
+        audience: this.audience,
+        expiresInSeconds: this.accessTokenExpiresInSeconds,
+      },
+    );
+
+    const sessionExpiresAt =
+      record.expires_at instanceof Date ? record.expires_at : new Date(record.expires_at);
+
+    return {
+      accessToken,
+      tokenType: 'Bearer',
+      expiresIn: this.accessTokenExpiresInSeconds,
+      rawRefreshToken: rawToken,
+      familyId: record.family_id,
+      expiresAt: sessionExpiresAt,
+    };
   }
 
   async register(rawInput: unknown): Promise<RegisterResult> {
@@ -104,8 +187,15 @@ export class DefaultAuthService implements AuthService {
         },
       );
 
+      const session = await this.issueSession(result.user.id, {
+        email: result.user.email,
+        phone: result.user.phone,
+        fullName: result.user.full_name,
+      });
+
       return {
         user: mapUserRowToResponse(result.user),
+        ...(session ? { session } : {}),
       };
     } catch (err) {
       if (err instanceof DuplicateEmailError) {
@@ -196,6 +286,158 @@ export class DefaultAuthService implements AuthService {
     // Authentication succeeded: reset failure count
     if (this.rateLimiter) {
       await this.rateLimiter.reset(rateLimitKey);
+    }
+
+    const session = await this.issueSession(user.id, {
+      email: user.email,
+      phone: user.phone,
+      fullName: user.full_name,
+    });
+
+    return {
+      user: mapUserRowToResponse(user),
+      ...(session ? { session } : {}),
+    };
+  }
+
+  async refresh(rawRefreshToken: string): Promise<RefreshResult> {
+    if (!this.keyPair || !this.refreshTokenRepo) {
+      throw new UnauthorizedError('Session subsystem not configured');
+    }
+
+    if (!rawRefreshToken || typeof rawRefreshToken !== 'string') {
+      throw new InvalidTokenError('Refresh token must be provided');
+    }
+
+    let oldTokenHash: string;
+    try {
+      oldTokenHash = hashRefreshToken(rawRefreshToken);
+    } catch {
+      throw new InvalidTokenError('Malformed refresh token');
+    }
+
+    const { rawToken: newRawToken, tokenHash: newTokenHash } = generateRefreshToken();
+    const newExpiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days idle per ADR-003
+
+    const rotateResult = await this.refreshTokenRepo.rotate({
+      oldTokenHash,
+      newTokenHash,
+      newExpiresAt,
+    });
+
+    if (!rotateResult.success) {
+      if (rotateResult.reason === 'REUSE_DETECTED') {
+        throw new InvalidTokenError(
+          'Refresh token reuse detected. Session family has been terminated.',
+          'TOKEN_REUSE_DETECTED',
+        );
+      }
+      if (rotateResult.reason === 'TOKEN_EXPIRED') {
+        throw new InvalidTokenError('Refresh token has expired', 'TOKEN_EXPIRED');
+      }
+      if (rotateResult.reason === 'TOKEN_REVOKED') {
+        throw new InvalidTokenError('Refresh token has been revoked', 'TOKEN_REVOKED');
+      }
+      throw new InvalidTokenError('Invalid refresh token', 'TOKEN_NOT_FOUND');
+    }
+
+    const userId = rotateResult.newToken.user_id;
+    const user = await this.userRepo.findById(userId);
+    if (!user) {
+      throw new UnauthorizedError('User account not found');
+    }
+    if (user.status === 'SUSPENDED') {
+      throw new AccountSuspendedError();
+    }
+    if (user.status !== 'ACTIVE') {
+      throw new AccountInactiveError();
+    }
+
+    const accessToken = signAccessToken(
+      {
+        sub: user.id,
+        email: user.email,
+        phone: user.phone,
+        fullName: user.full_name,
+      },
+      {
+        privateKey: this.keyPair.privateKey,
+        kid: this.keyPair.kid,
+        issuer: this.issuer,
+        audience: this.audience,
+        expiresInSeconds: this.accessTokenExpiresInSeconds,
+      },
+    );
+
+    const expiresAt =
+      rotateResult.newToken.expires_at instanceof Date
+        ? rotateResult.newToken.expires_at
+        : new Date(rotateResult.newToken.expires_at);
+
+    return {
+      accessToken,
+      tokenType: 'Bearer',
+      expiresIn: this.accessTokenExpiresInSeconds,
+      rawRefreshToken: newRawToken,
+      familyId: rotateResult.newToken.family_id,
+      expiresAt,
+    };
+  }
+
+  async logout(rawRefreshToken: string): Promise<LogoutResult> {
+    if (!this.refreshTokenRepo) {
+      return { success: true };
+    }
+
+    if (!rawRefreshToken || typeof rawRefreshToken !== 'string') {
+      return { success: true };
+    }
+
+    try {
+      const tokenHash = hashRefreshToken(rawRefreshToken);
+      const token = await this.refreshTokenRepo.findByTokenHash(tokenHash);
+      if (token) {
+        await this.refreshTokenRepo.revokeFamily(token.family_id, 'LOGOUT');
+      }
+    } catch {
+      // Invariant: Logout must always succeed / be idempotent
+    }
+
+    return { success: true };
+  }
+
+  async getCurrentUser(accessToken: string): Promise<CurrentUserResult> {
+    if (!this.keyPair) {
+      throw new UnauthorizedError('Session subsystem not configured');
+    }
+
+    if (!accessToken || typeof accessToken !== 'string') {
+      throw new UnauthorizedError('Missing or invalid Authorization header');
+    }
+
+    let payload;
+    try {
+      payload = verifyAccessToken(accessToken, {
+        publicKey: this.keyPair.publicKey,
+        expectedIssuer: this.issuer,
+        expectedAudience: this.audience,
+      });
+    } catch (err) {
+      if (err instanceof TokenVerificationError) {
+        throw new InvalidTokenError(err.message, err.reason);
+      }
+      throw new InvalidTokenError('Invalid access token');
+    }
+
+    const user = await this.userRepo.findById(payload.sub);
+    if (!user) {
+      throw new UnauthorizedError('User account not found');
+    }
+    if (user.status === 'SUSPENDED') {
+      throw new AccountSuspendedError();
+    }
+    if (user.status !== 'ACTIVE') {
+      throw new AccountInactiveError();
     }
 
     return {

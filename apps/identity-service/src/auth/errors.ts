@@ -139,3 +139,39 @@ export class UnsupportedMediaTypeError extends AuthError {
     super(detail, 'UNSUPPORTED_MEDIA_TYPE');
   }
 }
+
+/**
+ * Thrown when a request lacks valid authentication credentials.
+ */
+export class UnauthorizedError extends AuthError {
+  public readonly statusCode = 401;
+  public readonly title = 'Unauthorized';
+
+  constructor(detail = 'Authentication required', code = 'UNAUTHORIZED') {
+    super(detail, code);
+  }
+}
+
+/**
+ * Thrown when an access or refresh token is malformed, invalid, or expired.
+ */
+export class InvalidTokenError extends AuthError {
+  public readonly statusCode = 401;
+  public readonly title = 'Unauthorized';
+
+  constructor(detail = 'Invalid or expired token', code = 'INVALID_TOKEN') {
+    super(detail, code);
+  }
+}
+
+/**
+ * Thrown when an authenticated caller is forbidden from accessing a resource or fails CSRF verification.
+ */
+export class ForbiddenError extends AuthError {
+  public readonly statusCode = 403;
+  public readonly title = 'Forbidden';
+
+  constructor(detail = 'Access forbidden', code = 'FORBIDDEN') {
+    super(detail, code);
+  }
+}

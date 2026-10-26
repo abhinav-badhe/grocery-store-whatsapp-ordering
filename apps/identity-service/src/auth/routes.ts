@@ -1,8 +1,21 @@
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import type { HttpRequestHandler } from '@grocery/service-runtime';
 import type { Logger, RequestContext } from '@grocery/observability';
+import {
+  AuthResponseSchema,
+  TokenResponseSchema,
+  RefreshTokenResponseSchema,
+  LogoutResponseSchema,
+  CurrentUserResponseSchema,
+} from '@grocery/api-contracts';
 import type { AuthService } from './types.js';
-import { AuthError, PayloadTooLargeError, UnsupportedMediaTypeError } from './errors.js';
+import {
+  AuthError,
+  PayloadTooLargeError,
+  UnsupportedMediaTypeError,
+  UnauthorizedError,
+  ForbiddenError,
+} from './errors.js';
 
 const MAX_JSON_BODY_BYTES = 64 * 1024; // 64 KiB payload limit to prevent buffer exhaustion
 
@@ -22,6 +35,80 @@ export interface AuthRouteOptions {
    */
   readonly trustProxy?: boolean;
   readonly logger?: Logger;
+  readonly allowedOrigins?: readonly string[];
+  readonly cookieSecure?: boolean;
+}
+
+export function parseCookies(cookieHeader?: string): Record<string, string> {
+  if (!cookieHeader || typeof cookieHeader !== 'string') {
+    return {};
+  }
+  const cookies: Record<string, string> = {};
+  for (const pair of cookieHeader.split(';')) {
+    const [rawKey, ...valParts] = pair.trim().split('=');
+    if (rawKey && valParts.length > 0) {
+      cookies[rawKey.trim()] = decodeURIComponent(valParts.join('=').trim());
+    }
+  }
+  return cookies;
+}
+
+export function buildRefreshTokenCookie(
+  rawToken: string,
+  options: { maxAgeSeconds?: number; secure?: boolean } = {},
+): string {
+  const maxAge = options.maxAgeSeconds ?? 7 * 24 * 60 * 60; // 7 days idle per ADR-003
+  const isSecure = options.secure ?? true;
+  const secureFlag = isSecure ? '; Secure' : '';
+  return `refresh_token=${rawToken}; Path=/api/v1/auth; HttpOnly; SameSite=Strict${secureFlag}; Max-Age=${maxAge}`;
+}
+
+export function buildClearRefreshTokenCookie(options: { secure?: boolean } = {}): string {
+  const isSecure = options.secure ?? true;
+  const secureFlag = isSecure ? '; Secure' : '';
+  return `refresh_token=; Path=/api/v1/auth; HttpOnly; SameSite=Strict${secureFlag}; Max-Age=0`;
+}
+
+function validateCsrf(req: IncomingMessage, allowedOrigins?: readonly string[]): void {
+  const origin = req.headers['origin'];
+  const referer = req.headers['referer'];
+
+  // If origin is provided, verify against allowed origins when configured
+  if (allowedOrigins && allowedOrigins.length > 0) {
+    if (typeof origin === 'string') {
+      const originMatches = allowedOrigins.some((allowed) => allowed === origin);
+      if (!originMatches) {
+        throw new ForbiddenError(
+          `Cross-site request blocked: Origin '${origin}' is not authorized`,
+          'CSRF_VALIDATION_FAILED',
+        );
+      }
+      return;
+    }
+
+    if (typeof referer === 'string') {
+      try {
+        const refererUrl = new URL(referer);
+        const refererOrigin = refererUrl.origin;
+        const refererMatches = allowedOrigins.some((allowed) => allowed === refererOrigin);
+        if (!refererMatches) {
+          throw new ForbiddenError(
+            `Cross-site request blocked: Referer origin '${refererOrigin}' is not authorized`,
+            'CSRF_VALIDATION_FAILED',
+          );
+        }
+        return;
+      } catch {
+        throw new ForbiddenError('Malformed Referer header in request', 'CSRF_VALIDATION_FAILED');
+      }
+    }
+
+    // In production with configured allowedOrigins, missing both Origin and Referer on state-changing cookie requests is rejected
+    throw new ForbiddenError(
+      'Missing Origin or Referer header on state-changing request',
+      'CSRF_VALIDATION_FAILED',
+    );
+  }
 }
 
 async function readJsonBody(
@@ -85,7 +172,7 @@ function sendJsonResponse(res: ServerResponse, statusCode: number, data: unknown
 }
 
 /**
- * Creates an HTTP request handler for user registration and login endpoints.
+ * Creates an HTTP request handler for authentication, session management, and user identity endpoints.
  */
 export function createAuthRequestHandler(
   authService: AuthService,
@@ -98,11 +185,33 @@ export function createAuthRequestHandler(
       : ((options as AuthRouteOptions) ?? {});
   const logger = maybeLogger ?? opts.logger;
   const trustProxy = opts.trustProxy ?? false;
+  const cookieSecure = opts.cookieSecure ?? true;
+  const allowedOrigins = opts.allowedOrigins;
 
   return async (req: IncomingMessage, res: ServerResponse, context: RequestContext) => {
     const url = new URL(req.url ?? '/', `http://${req.headers.host ?? 'localhost'}`);
     const pathname = url.pathname;
     const method = req.method ?? 'GET';
+
+    // CORS headers
+    const reqOrigin = req.headers['origin'];
+    if (typeof reqOrigin === 'string' && allowedOrigins?.includes(reqOrigin)) {
+      res.setHeader('Access-Control-Allow-Origin', reqOrigin);
+      res.setHeader('Access-Control-Allow-Credentials', 'true');
+      res.setHeader('Vary', 'Origin');
+    }
+
+    if (method === 'OPTIONS') {
+      res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+      res.setHeader(
+        'Access-Control-Allow-Headers',
+        'Content-Type, Authorization, X-Requested-With',
+      );
+      res.setHeader('Access-Control-Max-Age', '86400');
+      res.statusCode = 204;
+      res.end();
+      return;
+    }
 
     const getClientIp = (): string => {
       if (trustProxy) {
@@ -139,7 +248,26 @@ export function createAuthRequestHandler(
         }
 
         const result = await authService.register(body);
-        sendJsonResponse(res, 201, result);
+
+        if (result.session) {
+          res.setHeader(
+            'Set-Cookie',
+            buildRefreshTokenCookie(result.session.rawRefreshToken, { secure: cookieSecure }),
+          );
+          const responsePayload = TokenResponseSchema.parse({
+            accessToken: result.session.accessToken,
+            tokenType: result.session.tokenType,
+            expiresIn: result.session.expiresIn,
+            user: result.user,
+          });
+          sendJsonResponse(res, 201, responsePayload);
+          return;
+        }
+
+        const responsePayload = AuthResponseSchema.parse({
+          user: result.user,
+        });
+        sendJsonResponse(res, 201, responsePayload);
         return;
       }
 
@@ -168,11 +296,92 @@ export function createAuthRequestHandler(
 
         const clientIp = getClientIp();
         const result = await authService.login(body, clientIp);
-        sendJsonResponse(res, 200, result);
+
+        if (result.session) {
+          res.setHeader(
+            'Set-Cookie',
+            buildRefreshTokenCookie(result.session.rawRefreshToken, { secure: cookieSecure }),
+          );
+          const responsePayload = TokenResponseSchema.parse({
+            accessToken: result.session.accessToken,
+            tokenType: result.session.tokenType,
+            expiresIn: result.session.expiresIn,
+            user: result.user,
+          });
+          sendJsonResponse(res, 200, responsePayload);
+          return;
+        }
+
+        const responsePayload = AuthResponseSchema.parse({
+          user: result.user,
+        });
+        sendJsonResponse(res, 200, responsePayload);
         return;
       }
 
-      // 3. Operational Root
+      // 3. POST /api/v1/auth/refresh (Rotation per ADR-003 / ADR-011)
+      if (method === 'POST' && pathname === '/api/v1/auth/refresh') {
+        validateCsrf(req, allowedOrigins);
+        const cookies = parseCookies(req.headers['cookie']);
+        const rawRefreshToken = cookies['refresh_token'];
+
+        if (!rawRefreshToken) {
+          throw new UnauthorizedError(
+            'Refresh token cookie is required for session refresh',
+            'REFRESH_TOKEN_REQUIRED',
+          );
+        }
+
+        const result = await authService.refresh(rawRefreshToken);
+        res.setHeader(
+          'Set-Cookie',
+          buildRefreshTokenCookie(result.rawRefreshToken, { secure: cookieSecure }),
+        );
+        const responsePayload = RefreshTokenResponseSchema.parse({
+          accessToken: result.accessToken,
+          tokenType: result.tokenType,
+          expiresIn: result.expiresIn,
+        });
+        sendJsonResponse(res, 200, responsePayload);
+        return;
+      }
+
+      // 4. POST /api/v1/auth/logout (Revocation & Cookie Clearance)
+      if (method === 'POST' && pathname === '/api/v1/auth/logout') {
+        validateCsrf(req, allowedOrigins);
+        const cookies = parseCookies(req.headers['cookie']);
+        const rawRefreshToken = cookies['refresh_token'];
+
+        if (rawRefreshToken) {
+          await authService.logout(rawRefreshToken);
+        }
+
+        res.setHeader('Set-Cookie', buildClearRefreshTokenCookie({ secure: cookieSecure }));
+        const responsePayload = LogoutResponseSchema.parse({ success: true });
+        sendJsonResponse(res, 200, responsePayload);
+        return;
+      }
+
+      // 5. GET /api/v1/auth/me (User verification via Bearer access token)
+      if (method === 'GET' && pathname === '/api/v1/auth/me') {
+        const authHeader = req.headers['authorization'];
+        if (!authHeader || !authHeader.startsWith('Bearer ')) {
+          throw new UnauthorizedError(
+            'Bearer access token is required in Authorization header',
+            'UNAUTHORIZED',
+          );
+        }
+
+        const token = authHeader.slice(7).trim();
+        const result = await authService.getCurrentUser(token);
+        const responsePayload = CurrentUserResponseSchema.parse({
+          user: result.user,
+        });
+        sendJsonResponse(res, 200, responsePayload);
+        return;
+      }
+
+      // 6. Operational Root
       if (method === 'GET' && pathname === '/') {
         sendJsonResponse(res, 200, {
           service: 'identity-service',

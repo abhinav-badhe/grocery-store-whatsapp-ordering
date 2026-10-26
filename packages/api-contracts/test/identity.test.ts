@@ -8,6 +8,10 @@ import {
   UserStatusSchema,
   UserResponseSchema,
   AuthResponseSchema,
+  TokenResponseSchema,
+  RefreshTokenResponseSchema,
+  LogoutResponseSchema,
+  CurrentUserResponseSchema,
   StoreStatusSchema,
   StoreProfileSchema,
   CreateStoreInputSchema,
@@ -178,6 +182,54 @@ describe('Identity API Contracts: User & Authentication Responses', () => {
   it('validates AuthResponse contract containing user representation', () => {
     const authRes = AuthResponseSchema.parse({ user: validUser });
     assert.equal(authRes.user.id, validUser.id);
+  });
+
+  it('validates TokenResponseSchema containing memory access token and user', () => {
+    const tokenRes = TokenResponseSchema.parse({
+      accessToken: 'eyJhbGciOiJFZERTQSI...sample-access-token',
+      expiresIn: 900,
+      user: validUser,
+    });
+    assert.equal(tokenRes.accessToken, 'eyJhbGciOiJFZERTQSI...sample-access-token');
+    assert.equal(tokenRes.tokenType, 'Bearer');
+    assert.equal(tokenRes.expiresIn, 900);
+    assert.equal(tokenRes.user.id, validUser.id);
+  });
+
+  it('rejects TokenResponseSchema with missing access token or non-positive expiresIn', () => {
+    assert.throws(() =>
+      TokenResponseSchema.parse({
+        accessToken: '',
+        expiresIn: 900,
+        user: validUser,
+      }),
+    );
+    assert.throws(() =>
+      TokenResponseSchema.parse({
+        accessToken: 'valid-token',
+        expiresIn: 0,
+        user: validUser,
+      }),
+    );
+  });
+
+  it('validates RefreshTokenResponseSchema containing rotated access token without user payload', () => {
+    const refreshRes = RefreshTokenResponseSchema.parse({
+      accessToken: 'new-access-token-rotated',
+      expiresIn: 900,
+    });
+    assert.equal(refreshRes.accessToken, 'new-access-token-rotated');
+    assert.equal(refreshRes.tokenType, 'Bearer');
+    assert.equal(refreshRes.expiresIn, 900);
+  });
+
+  it('validates LogoutResponseSchema and CurrentUserResponseSchema', () => {
+    const logoutRes = LogoutResponseSchema.parse({ success: true });
+    assert.equal(logoutRes.success, true);
+    assert.throws(() => LogoutResponseSchema.parse({}));
+
+    const meRes = CurrentUserResponseSchema.parse({ user: validUser });
+    assert.equal(meRes.user.id, validUser.id);
   });
 
   it('proves UserResponseSchema does not expose password hashes or credential secrets in its schema shape', () => {

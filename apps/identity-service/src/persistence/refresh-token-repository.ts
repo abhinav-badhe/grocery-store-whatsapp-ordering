@@ -86,6 +86,8 @@ export class KyselyRefreshTokenRepository implements RefreshTokenRepository {
         'INVALID_TOKEN_HASH',
       );
     }
+    const familyExpiresAt =
+      token.family_expires_at ?? new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
     try {
       const row = await this.getExecutor(trx)
         .insertInto('identity.refresh_tokens')
@@ -93,6 +95,7 @@ export class KyselyRefreshTokenRepository implements RefreshTokenRepository {
           ...token,
           token_hash: normalizedHash,
           status: token.status ?? 'ACTIVE',
+          family_expires_at: familyExpiresAt,
         })
         .returningAll()
         .executeTakeFirstOrThrow();
@@ -139,9 +142,17 @@ export class KyselyRefreshTokenRepository implements RefreshTokenRepository {
         return { success: false, reason: 'TOKEN_REVOKED', token: existingToken };
       }
 
-      // 3. Expired token presented
+      // 3. Expired token presented (idle expiration check)
       const expiresAt = new Date(existingToken.expires_at);
       if (expiresAt.getTime() <= now.getTime()) {
+        return { success: false, reason: 'TOKEN_EXPIRED', token: existingToken };
+      }
+
+      // 3b. Expired token family presented (Finding H-1: 30-day absolute ceiling check)
+      // The family absolute lifetime is immutable from initial creation.
+      // If family_expires_at has passed, rotation is strictly forbidden even if individual idle expires_at is in the future.
+      const familyExpiresAt = new Date(existingToken.family_expires_at);
+      if (familyExpiresAt.getTime() <= now.getTime()) {
         return { success: false, reason: 'TOKEN_EXPIRED', token: existingToken };
       }
 
@@ -172,6 +183,12 @@ export class KyselyRefreshTokenRepository implements RefreshTokenRepository {
 
       // 5. Active token: Execute atomic rotation
       // Step A: Insert new active token in the same family
+      // Bound the new token's idle expires_at so it never exceeds the immutable family_expires_at
+      const boundedExpiresAt =
+        params.newExpiresAt.getTime() > familyExpiresAt.getTime()
+          ? familyExpiresAt
+          : params.newExpiresAt;
+
       const newToken = await executor
         .insertInto('identity.refresh_tokens')
         .values({
@@ -179,7 +196,8 @@ export class KyselyRefreshTokenRepository implements RefreshTokenRepository {
           family_id: existingToken.family_id,
           token_hash: newHash,
           status: 'ACTIVE',
-          expires_at: params.newExpiresAt,
+          expires_at: boundedExpiresAt,
+          family_expires_at: existingToken.family_expires_at, // IMMUTABLE PROPAGATION
         })
         .returningAll()
         .executeTakeFirstOrThrow();

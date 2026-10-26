@@ -4,3 +4,8 @@ export * from './common/money.js';
 export * from './common/errors.js';
 export * from './health/health.js';
 export * from './identity/index.js';
+export * from './catalog/index.js';
+export * from './inventory/index.js';
+export * from './order/index.js';
+export * from './payment/index.js';
+export * from './whatsapp/index.js';

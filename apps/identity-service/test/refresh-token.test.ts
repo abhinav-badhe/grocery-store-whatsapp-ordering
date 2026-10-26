@@ -420,6 +420,7 @@ describe('Refresh Token Persistence & Rotation Foundation', () => {
               revoked_reason: null,
               replaced_by_token_id: null,
               expires_at: new Date(Date.now() - 10000), // expired 10s ago
+              family_expires_at: new Date(Date.now() + 864000000), // family still active
               created_at: new Date(),
               updated_at: new Date(),
             },
@@ -437,6 +438,142 @@ describe('Refresh Token Persistence & Rotation Foundation', () => {
       assert.equal(result.success, false);
       if (!result.success) {
         assert.equal(result.reason, 'TOKEN_EXPIRED');
+      }
+    });
+
+    it('returns TOKEN_EXPIRED when presenting token has passed its family_expires_at, even if idle expires_at is active', async () => {
+      const tokenHash = hashRefreshToken('active-token-expired-family');
+      const mockDb = createMockKysely({
+        onExecuteQuery: () => ({
+          rows: [
+            {
+              id: '00000000-0000-4000-8000-000000000001',
+              user_id: '10000000-0000-4000-8000-000000000001',
+              family_id: '20000000-0000-4000-8000-000000000001',
+              token_hash: tokenHash,
+              status: 'ACTIVE',
+              consumed_at: null,
+              revoked_at: null,
+              revoked_reason: null,
+              replaced_by_token_id: null,
+              expires_at: new Date(Date.now() + 86400000), // idle expires in 24 hours
+              family_expires_at: new Date(Date.now() - 5000), // 30-day family ceiling elapsed 5s ago
+              created_at: new Date(Date.now() - 30 * 86400000),
+              updated_at: new Date(),
+            },
+          ],
+        }),
+      });
+
+      const repo = createRefreshTokenRepository(mockDb);
+      const result = await repo.rotate({
+        oldTokenHash: tokenHash,
+        newTokenHash: hashRefreshToken('new-token'),
+        newExpiresAt: new Date(Date.now() + 86400000),
+      });
+
+      // CRITICAL INVARIANT (Finding H-1): Rotation must fail with TOKEN_EXPIRED once 30-day absolute ceiling is reached
+      assert.equal(result.success, false);
+      if (!result.success) {
+        assert.equal(result.reason, 'TOKEN_EXPIRED');
+      }
+    });
+
+    it('clamps replacement token expires_at to family_expires_at when newExpiresAt would exceed the family ceiling', async () => {
+      const oldHash = hashRefreshToken('old-token-near-family-end');
+      const newHash = hashRefreshToken('new-token-clamped');
+      const familyExpiresAt = new Date(Date.now() + 3600000); // exactly 1 hour remaining in family lifetime
+      const requestedExpiresAt = new Date(Date.now() + 7 * 86400000); // requesting 7 days
+      let capturedInsertExpiresAt: Date | null = null;
+      let capturedFamilyExpiresAt: Date | null = null;
+
+      const mockDb = createMockKysely({
+        onExecuteQuery: (sql, params) => {
+          if (sql.includes('select') && sql.includes('"token_hash" = $1')) {
+            return {
+              rows: [
+                {
+                  id: '00000000-0000-4000-8000-000000000001',
+                  user_id: '10000000-0000-4000-8000-000000000001',
+                  family_id: '20000000-0000-4000-8000-000000000001',
+                  token_hash: oldHash,
+                  status: 'ACTIVE',
+                  consumed_at: null,
+                  revoked_at: null,
+                  revoked_reason: null,
+                  replaced_by_token_id: null,
+                  expires_at: new Date(Date.now() + 1800000),
+                  family_expires_at: familyExpiresAt,
+                  created_at: new Date(),
+                  updated_at: new Date(),
+                },
+              ],
+            };
+          }
+          if (sql.includes('insert into "identity"."refresh_tokens"')) {
+            // Find expires_at and family_expires_at in parameters
+            for (const param of params) {
+              if (param instanceof Date) {
+                if (param.getTime() === familyExpiresAt.getTime()) {
+                  capturedFamilyExpiresAt = param;
+                }
+              }
+            }
+            return {
+              rows: [
+                {
+                  id: '00000000-0000-4000-8000-000000000002',
+                  user_id: '10000000-0000-4000-8000-000000000001',
+                  family_id: '20000000-0000-4000-8000-000000000001',
+                  token_hash: newHash,
+                  status: 'ACTIVE',
+                  consumed_at: null,
+                  revoked_at: null,
+                  revoked_reason: null,
+                  replaced_by_token_id: null,
+                  expires_at: familyExpiresAt, // Clamped to 1 hour!
+                  family_expires_at: familyExpiresAt, // Preserved!
+                  created_at: new Date(),
+                  updated_at: new Date(),
+                },
+              ],
+            };
+          }
+          if (sql.includes('update "identity"."refresh_tokens"')) {
+            return {
+              rows: [
+                {
+                  id: '00000000-0000-4000-8000-000000000001',
+                  status: 'CONSUMED',
+                  replaced_by_token_id: '00000000-0000-4000-8000-000000000002',
+                  family_expires_at: familyExpiresAt,
+                },
+              ],
+            };
+          }
+          return { rows: [] };
+        },
+      });
+
+      const repo = createRefreshTokenRepository(mockDb);
+      const result = await repo.rotate({
+        oldTokenHash: oldHash,
+        newTokenHash: newHash,
+        newExpiresAt: requestedExpiresAt,
+      });
+
+      assert.equal(result.success, true);
+      if (result.success) {
+        assert.equal(
+          new Date(result.newToken.expires_at).getTime(),
+          familyExpiresAt.getTime(),
+          'Replacement token expires_at must be clamped to family_expires_at',
+        );
+        assert.equal(
+          new Date(result.newToken.family_expires_at).getTime(),
+          familyExpiresAt.getTime(),
+          'Replacement token must preserve immutable family_expires_at',
+        );
       }
     });
   });

@@ -30,6 +30,7 @@
 | **[ADR-008](./ADR-008-hosting-secrets-backups-and-recovery.md)** | Production Hosting (Vercel + Render), CloudAMQP, Storage & DR | `Proposed` | Vercel for frontend; Render for Gateway, Private Services, and Workers; CloudAMQP proposed for RabbitMQ; S3-compatible storage abstraction; provisional RPO $\le 1$h, RTO $\le 2$h. | **DevOps Lead & System Operator** | ADR-001, ADR-002 | Blocks Phase 1 Docker Compose, health endpoints, and Phase 8 operations. | Spec v2.0 §1, §15, §17; Baseline v3.0 §14–16 |
 | **[ADR-009](./ADR-009-event-contracts-and-delivery-reliability.md)** | Event Contracts, Transactional Outbox, CloudAMQP & Failure Recovery | `Proposed` | CloudAMQP managed broker; Transactional Outbox with publisher confirms; Consumer Inbox deduplication; DLQ with bounded retries & replay CLI; no exactly-once claims. | **Lead Backend Architect** | ADR-001, ADR-002, ADR-008 | Blocks Phase 1 message contracts and Phase 4 cross-service events. | Spec v2.0 §8, §9; Baseline v3.0 §12 |
 | **[ADR-010](./ADR-010-product-units-variants-and-pricing.md)** | Product Variants, Canonical Units & Price Snapshots | `Proposed` | Product $\rightarrow$ Variant/SKU hierarchy; canonical units (`KG`, `G`, `L`, `ML`, `PIECE`); validated fractional quantities; immutable order price snapshots. | **Catalog Domain Lead & Product Owner** | ADR-001, ADR-002 | Blocks Phase 2 Catalog schema and Phase 3 Inventory balances. | Spec v2.0 §6; Baseline v3.0 §9 |
+| **[ADR-011](./ADR-011-public-ingress-cors-and-cross-origin-cookie-transport.md)** | Public Ingress, CORS, Cookie Transport & Trusted Proxy Architecture | `Proposed` | Evaluates Vercel + Render deployment options (shared apex domain vs. same-origin Next.js BFF proxy); defines credentialed CORS, exact Origin CSRF validation, and trusted proxy contracts. | **System Architect & Security Lead** | ADR-001, ADR-003 | Blocks frontend-to-gateway session cookie transport and CORS configuration. | Spec v2.0 §3, §10; Baseline v3.0 §14 |
 
 ---
 
@@ -39,7 +40,9 @@ The following decisions require explicit stakeholder sign-off before Phase 1 imp
 
 1. **ADR-001 Approval (System Architect):** Ratify Next.js App Router on Vercel and the Render service-worker topology.
 2. **ADR-002 Approval (Database Architect):** Approve Schema-per-Service on Render Postgres 16 with PgBouncer pooling and connection budgeting.
-3. **ADR-004 Provider Selection (Product Owner):** Specify target payment gateway (e.g. Razorpay vs. Stripe).
-4. **ADR-005 Tax Policy (Finance Lead):** Specify tax jurisdiction, tax-inclusive vs. exclusive catalog pricing, and invoice numbering format.
-5. **ADR-006 WhatsApp Setup (WhatsApp Ops Lead):** Confirm Meta Business Account setup and provisioned Phone Number IDs.
-6. **ADR-008 Hosting & Storage Approval (DevOps Lead / Business Owner):** Approve Vercel Pro, Render compute tiers, CloudAMQP hosting budget, and Object Storage provider.
+3. **ADR-003 Approval (Security Lead & Product Owner):** Approve public access token signing (Ed25519), session lifetimes, and cookie scoping.
+4. **ADR-004 Provider Selection (Product Owner):** Specify target payment gateway (e.g. Razorpay vs. Stripe).
+5. **ADR-005 Tax Policy (Finance Lead):** Specify tax jurisdiction, tax-inclusive vs. exclusive catalog pricing, and invoice numbering format.
+6. **ADR-006 WhatsApp Setup (WhatsApp Ops Lead):** Confirm Meta Business Account setup and provisioned Phone Number IDs.
+7. **ADR-008 Hosting & Storage Approval (DevOps Lead / Business Owner):** Approve Vercel Pro, Render compute tiers, CloudAMQP hosting budget, and Object Storage provider.
+8. **ADR-011 Approval (System Architect & Security Lead):** Ratify Option A (shared custom domain) vs. Option B (Vercel proxy) and trusted proxy parsing model.

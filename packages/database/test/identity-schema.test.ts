@@ -328,6 +328,7 @@ describe('Identity Schema: Kysely TypeScript Interfaces', () => {
       revoked_reason: null,
       replaced_by_token_id: null,
       expires_at: new Date(),
+      family_expires_at: new Date() as unknown as RefreshTokensTable['family_expires_at'],
       created_at: new Date() as unknown as RefreshTokensTable['created_at'],
       updated_at: new Date() as unknown as RefreshTokensTable['updated_at'],
     };
@@ -350,7 +351,7 @@ describe('Identity Schema: Kysely TypeScript Interfaces', () => {
 });
 
 describe('Identity Schema: Mock Migration Execution', () => {
-  it('executes 0001, 0002, and 0003 migrations transactionally with advisory lock', async () => {
+  it('executes 0001, 0002, 0003, and 0004 migrations transactionally with advisory lock', async () => {
     const executedQueries: string[] = [];
     const ledger: Array<{ version: string; name: string; checksum: string }> = [];
 
@@ -406,16 +407,23 @@ describe('Identity Schema: Mock Migration Execution', () => {
       client: mockClient,
     });
 
-    assert.equal(report.applied.length, 3);
+    assert.equal(report.applied.length, 10);
     assert.equal(report.applied[0]!.version, '0001');
     assert.equal(report.applied[1]!.version, '0002');
     assert.equal(report.applied[2]!.version, '0003');
+    assert.equal(report.applied[3]!.version, '0004');
+    assert.equal(report.applied[4]!.version, '0005');
+    assert.equal(report.applied[5]!.version, '0006');
+    assert.equal(report.applied[6]!.version, '0007');
+    assert.equal(report.applied[7]!.version, '0008');
+    assert.equal(report.applied[8]!.version, '0009');
+    assert.equal(report.applied[9]!.version, '0010');
     assert.equal(report.alreadyAppliedCount, 0);
 
     // Verify atomic transaction wrapping for each migration
     const beginCount = executedQueries.filter((q) => q === 'BEGIN;').length;
     const commitCount = executedQueries.filter((q) => q === 'COMMIT;').length;
-    assert.equal(beginCount, 3);
-    assert.equal(commitCount, 3);
+    assert.equal(beginCount, 10);
+    assert.equal(commitCount, 10);
   });
 });

@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { StoreIdSchema } from '../common/identifiers.js';
+import { StoreRoleSchema, MembershipStatusSchema, StoreMembershipSchema } from './membership.js';
 
 /**
  * Store lifecycle status enumeration.
@@ -74,3 +75,51 @@ export const CreateStoreInputSchema = z.object({
 });
 
 export type CreateStoreInput = z.infer<typeof CreateStoreInputSchema>;
+
+/**
+ * Response schema for store lookup.
+ */
+export const StoreResponseSchema = z.object({
+  store: StoreProfileSchema,
+});
+
+export type StoreResponse = z.infer<typeof StoreResponseSchema>;
+
+/**
+ * Response schema for atomic store creation with initial OWNER membership.
+ */
+export const CreateStoreResponseSchema = z.object({
+  store: StoreProfileSchema,
+  membership: StoreMembershipSchema,
+});
+
+export type CreateStoreResponse = z.infer<typeof CreateStoreResponseSchema>;
+
+/**
+ * Item schema for a store associated with an authenticated user and their active role.
+ */
+export const UserStoreItemSchema = z.object({
+  store: StoreProfileSchema,
+  role: StoreRoleSchema,
+  membershipStatus: MembershipStatusSchema,
+});
+
+export type UserStoreItem = z.infer<typeof UserStoreItemSchema>;
+
+/**
+ * Response schema for listing stores associated with an authenticated user.
+ */
+export const UserStoreListResponseSchema = z.object({
+  stores: z.array(UserStoreItemSchema),
+});
+
+export type UserStoreListResponse = z.infer<typeof UserStoreListResponseSchema>;
+
+/**
+ * General store list response schema.
+ */
+export const StoreListResponseSchema = z.object({
+  stores: z.array(StoreProfileSchema),
+});
+
+export type StoreListResponse = z.infer<typeof StoreListResponseSchema>;

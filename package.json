@@ -9,10 +9,14 @@
     "pnpm": ">=12.0.0"
   },
   "scripts": {
+    "dev": "node scripts/dev-server.mjs",
+    "start": "node scripts/dev-server.mjs",
     "build": "pnpm -r build",
+    "typecheck": "pnpm -r typecheck",
     "format:check": "prettier --check README.md \"*.{json,yaml,yml}\" \"{packages,apps}/**/*.{json,yaml,yml,mjs,js,ts}\" \"!pnpm-lock.yaml\"",
     "format": "prettier --write README.md \"*.{json,yaml,yml}\" \"{packages,apps}/**/*.{json,yaml,yml,mjs,js,ts}\" \"!pnpm-lock.yaml\"",
-    "test": "pnpm -r test"
+    "test": "pnpm -r test",
+    "test:e2e": "node scripts/simulate-e2e-workflow.mjs"
   },
   "devDependencies": {
     "@types/node": "^22.13.5",

@@ -18,8 +18,10 @@
   "dependencies": {
     "@grocery/api-contracts": "workspace:*",
     "@grocery/config": "workspace:*",
+    "@grocery/database": "workspace:*",
     "@grocery/observability": "workspace:*",
-    "@grocery/service-runtime": "workspace:*"
+    "@grocery/service-runtime": "workspace:*",
+    "kysely": "^0.27.5"
   },
   "devDependencies": {
     "@grocery/tsconfig": "workspace:*",
