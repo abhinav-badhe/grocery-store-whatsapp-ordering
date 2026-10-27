@@ -62,9 +62,7 @@ export interface ShopkeeperPageData {
 }
 
 export function renderShopkeeperConsoleHtml(data: ShopkeeperPageData): string {
-  const pendingCount = data.orders.filter(
-    (o) => o.status === 'AWAITING_SHOPKEEPER_REVIEW',
-  ).length;
+  const pendingCount = data.orders.filter((o) => o.status === 'AWAITING_SHOPKEEPER_REVIEW').length;
   const activeCount = data.orders.filter(
     (o) => o.status === 'CONFIRMED' || o.status === 'PREPARING' || o.status === 'PACKING',
   ).length;
@@ -78,12 +76,16 @@ export function renderShopkeeperConsoleHtml(data: ShopkeeperPageData): string {
       ? data.orders
           .map((order) => {
             const isPending = order.status === 'AWAITING_SHOPKEEPER_REVIEW';
-            const statusClass = isPending ? 'badge-pending' : order.status === 'CONFIRMED' ? 'badge-confirmed' : 'badge-neutral';
+            const statusClass = isPending
+              ? 'badge-pending'
+              : order.status === 'CONFIRMED'
+                ? 'badge-confirmed'
+                : 'badge-neutral';
             const actionBtn = isPending
               ? `<button type="button" class="btn-action btn-confirm" onclick="confirmOrder('${order.id}')">Confirm order</button>`
               : order.status === 'CONFIRMED'
-              ? `<button type="button" class="btn-action btn-secondary" onclick="generateInvoice('${order.id}')">Generate invoice</button>`
-              : `<span class="text-muted">Settled</span>`;
+                ? `<button type="button" class="btn-action btn-secondary" onclick="generateInvoice('${order.id}')">Generate invoice</button>`
+                : `<span class="text-muted">Settled</span>`;
 
             return `
         <tr id="order-row-${order.id}">

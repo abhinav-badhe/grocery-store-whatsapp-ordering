@@ -1,9 +1,6 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import {
-  InvoiceService,
-  InMemoryInvoiceRepository,
-} from '../dist/index.js';
+import { InvoiceService, InMemoryInvoiceRepository } from '../dist/index.js';
 import { InMemoryStorageService } from '@grocery/service-runtime';
 import type { OrderRepository, OrderWithItems } from '../src/persistence/types.js';
 
@@ -107,7 +104,9 @@ describe('Billing & Invoice Module (ADR-001, ADR-002, ADR-005, ADR-010)', () => 
     });
 
     // 5% GST (500 basis points)
-    const result = await invoiceService.generateInvoice(storeId, orderId, { taxRateBasisPoints: 500 });
+    const result = await invoiceService.generateInvoice(storeId, orderId, {
+      taxRateBasisPoints: 500,
+    });
     const { invoice, lines } = result;
 
     assert.ok(invoice.invoiceNumber.startsWith('INV-'));

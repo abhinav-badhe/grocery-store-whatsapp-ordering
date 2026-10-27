@@ -15,6 +15,7 @@
     "typecheck": "pnpm -r typecheck",
     "format:check": "prettier --check README.md \"*.{json,yaml,yml}\" \"{packages,apps}/**/*.{json,yaml,yml,mjs,js,ts}\" \"!pnpm-lock.yaml\"",
     "format": "prettier --write README.md \"*.{json,yaml,yml}\" \"{packages,apps}/**/*.{json,yaml,yml,mjs,js,ts}\" \"!pnpm-lock.yaml\"",
+    "lint": "eslint -c packages/eslint-config/index.mjs packages apps",
     "test": "pnpm -r test",
     "test:e2e": "node scripts/simulate-e2e-workflow.mjs"
   },

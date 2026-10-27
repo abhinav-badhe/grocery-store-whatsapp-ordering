@@ -3,13 +3,19 @@
  * Conforms to ADR-002, ADR-005, and ADR-010
  */
 
-import { Invoice, InvoiceLineSnapshot, CreditNote } from './types.js';
+import type { Invoice, InvoiceLineSnapshot, CreditNote } from './types.js';
 
 export interface InvoiceRepositoryPort {
   createInvoice(invoice: Invoice, lines: InvoiceLineSnapshot[]): Promise<Invoice>;
   getNextInvoiceNumber(storeId: string, fiscalYear: string): Promise<string>;
-  findById(storeId: string, invoiceId: string): Promise<{ invoice: Invoice; lines: InvoiceLineSnapshot[] } | null>;
-  findByOrderId(storeId: string, orderId: string): Promise<{ invoice: Invoice; lines: InvoiceLineSnapshot[] } | null>;
+  findById(
+    storeId: string,
+    invoiceId: string,
+  ): Promise<{ invoice: Invoice; lines: InvoiceLineSnapshot[] } | null>;
+  findByOrderId(
+    storeId: string,
+    orderId: string,
+  ): Promise<{ invoice: Invoice; lines: InvoiceLineSnapshot[] } | null>;
   createCreditNote(creditNote: CreditNote): Promise<CreditNote>;
   updateStatus(storeId: string, invoiceId: string, status: Invoice['status']): Promise<void>;
 }
@@ -33,7 +39,10 @@ export class InMemoryInvoiceRepository implements InvoiceRepositoryPort {
     return invoice;
   }
 
-  async findById(storeId: string, invoiceId: string): Promise<{ invoice: Invoice; lines: InvoiceLineSnapshot[] } | null> {
+  async findById(
+    storeId: string,
+    invoiceId: string,
+  ): Promise<{ invoice: Invoice; lines: InvoiceLineSnapshot[] } | null> {
     const invoice = this.invoices.get(invoiceId);
     if (!invoice || invoice.storeId !== storeId) {
       return null;
@@ -42,7 +51,10 @@ export class InMemoryInvoiceRepository implements InvoiceRepositoryPort {
     return { invoice, lines };
   }
 
-  async findByOrderId(storeId: string, orderId: string): Promise<{ invoice: Invoice; lines: InvoiceLineSnapshot[] } | null> {
+  async findByOrderId(
+    storeId: string,
+    orderId: string,
+  ): Promise<{ invoice: Invoice; lines: InvoiceLineSnapshot[] } | null> {
     for (const invoice of this.invoices.values()) {
       if (invoice.storeId === storeId && invoice.orderId === orderId) {
         const lines = this.lines.get(invoice.id) ?? [];

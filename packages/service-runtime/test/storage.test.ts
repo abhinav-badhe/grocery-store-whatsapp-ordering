@@ -13,7 +13,10 @@ describe('StorageServicePort & InMemoryStorageService (ADR-008)', () => {
     });
 
     assert.ok(result.uploadUrl.includes('inv-001.pdf'));
-    assert.equal(result.fileKey, 'stores/550e8400-e29b-41d4-a716-446655440000/invoices/2026/inv-001.pdf');
+    assert.equal(
+      result.fileKey,
+      'stores/550e8400-e29b-41d4-a716-446655440000/invoices/2026/inv-001.pdf',
+    );
     assert.equal(result.headers?.['Content-Type'], 'application/pdf');
     assert.ok(new Date(result.expiresAt).getTime() > Date.now());
   });

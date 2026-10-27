@@ -4,7 +4,10 @@ import type { NotificationChannelAdapter, NotificationMessage } from '../channel
 import { WhatsAppChannelAdapter } from '../channels/whatsapp-adapter.js';
 import { SmsChannelAdapter } from '../channels/sms-adapter.js';
 
-import { InMemoryInboxRepository, type InboxRepositoryPort } from '../persistence/inbox-repository.js';
+import {
+  InMemoryInboxRepository,
+  type InboxRepositoryPort,
+} from '../persistence/inbox-repository.js';
 
 export interface DispatcherResult {
   readonly processed: number;

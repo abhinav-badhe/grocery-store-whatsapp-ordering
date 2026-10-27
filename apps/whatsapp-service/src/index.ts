@@ -35,10 +35,8 @@ import {
   HttpWhatsAppOutboundClient,
   type WhatsAppOutboundClient,
 } from './clients/whatsapp-outbound-client.js';
-import {
-  ConversationCoordinator,
-  createConversationCoordinator,
-} from './coordinator/conversation-coordinator.js';
+import type { ConversationCoordinator } from './coordinator/conversation-coordinator.js';
+import { createConversationCoordinator } from './coordinator/conversation-coordinator.js';
 import { createWhatsAppRoutes } from './routes.js';
 
 // Subphase 1: Grocery Parser

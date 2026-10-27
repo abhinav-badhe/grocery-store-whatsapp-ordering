@@ -1,6 +1,6 @@
 import { type WhatsAppInboundMessage, type ProvisionalQuoteSnapshot } from '@grocery/api-contracts';
 import { DeterministicGroceryParser } from '../parser/grocery-list-parser.js';
-import { CatalogResolver } from '../resolver/catalog-resolver.js';
+import type { CatalogResolver } from '../resolver/catalog-resolver.js';
 import { QuoteGenerator } from '../quote/quote-generator.js';
 import type { QuoteRepository } from '../persistence/quote-repository.js';
 import type { InboundMessageRepository } from '../persistence/inbound-message-repository.js';

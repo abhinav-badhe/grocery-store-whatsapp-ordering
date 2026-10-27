@@ -407,7 +407,7 @@ describe('Identity Schema: Mock Migration Execution', () => {
       client: mockClient,
     });
 
-    assert.equal(report.applied.length, 10);
+    assert.equal(report.applied.length, 11);
     assert.equal(report.applied[0]!.version, '0001');
     assert.equal(report.applied[1]!.version, '0002');
     assert.equal(report.applied[2]!.version, '0003');
@@ -418,12 +418,13 @@ describe('Identity Schema: Mock Migration Execution', () => {
     assert.equal(report.applied[7]!.version, '0008');
     assert.equal(report.applied[8]!.version, '0009');
     assert.equal(report.applied[9]!.version, '0010');
+    assert.equal(report.applied[10]!.version, '0011');
     assert.equal(report.alreadyAppliedCount, 0);
 
     // Verify atomic transaction wrapping for each migration
     const beginCount = executedQueries.filter((q) => q === 'BEGIN;').length;
     const commitCount = executedQueries.filter((q) => q === 'COMMIT;').length;
-    assert.equal(beginCount, 10);
-    assert.equal(commitCount, 10);
+    assert.equal(beginCount, 11);
+    assert.equal(commitCount, 11);
   });
 });

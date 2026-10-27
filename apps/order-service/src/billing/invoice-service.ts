@@ -4,11 +4,12 @@
  */
 
 import crypto from 'node:crypto';
-import { Invoice, InvoiceLineSnapshot, CreditNote } from './types.js';
-import { InvoiceRepositoryPort, InMemoryInvoiceRepository } from './invoice-repository.js';
+import type { Invoice, InvoiceLineSnapshot, CreditNote } from './types.js';
+import type { InvoiceRepositoryPort } from './invoice-repository.js';
+import { InMemoryInvoiceRepository } from './invoice-repository.js';
 import type { OrderRepository } from '../persistence/types.js';
 import type { OrderItemRow } from '@grocery/database';
-import { StorageServicePort } from '@grocery/service-runtime';
+import type { StorageServicePort } from '@grocery/service-runtime';
 
 export interface InvoiceServiceOptions {
   readonly invoiceRepository?: InvoiceRepositoryPort;
@@ -44,9 +45,16 @@ export class InvoiceService {
       throw new Error(`Order not found or access denied: ${orderId}`);
     }
 
-    const unconfirmedStatuses = ['RECEIVED', 'AWAITING_SHOPKEEPER_REVIEW', 'CHANGE_REQUESTED', 'REJECTED'];
+    const unconfirmedStatuses = [
+      'RECEIVED',
+      'AWAITING_SHOPKEEPER_REVIEW',
+      'CHANGE_REQUESTED',
+      'REJECTED',
+    ];
     if (unconfirmedStatuses.includes(order.status)) {
-      throw new Error(`Cannot generate invoice for order in status ${order.status}. Order must be confirmed first.`);
+      throw new Error(
+        `Cannot generate invoice for order in status ${order.status}. Order must be confirmed first.`,
+      );
     }
 
     // 3. Compute item snapshots & GST breakdown in integer paise (ADR-005 & ADR-010)
@@ -72,7 +80,8 @@ export class InvoiceService {
         invoiceId,
         storeId,
         productId: item.product_id,
-        itemNameSnapshot: item.product_name_snapshot ?? (item as any).product_name ?? 'Grocery Item',
+        itemNameSnapshot:
+          item.product_name_snapshot ?? (item as any).product_name ?? 'Grocery Item',
         skuSnapshot: item.sku_snapshot ?? (item as any).sku ?? null,
         unitOfMeasureSnapshot: item.unit_snapshot ?? (item as any).unit ?? 'UNIT',
         unitPriceMinorSnapshot: unitPriceMinor,

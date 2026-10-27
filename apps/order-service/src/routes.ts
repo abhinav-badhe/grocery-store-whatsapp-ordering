@@ -407,10 +407,18 @@ export function createOrderRoutes(options: OrderRoutesOptions): HttpRequestHandl
           // POST /api/v1/orders/:id/invoice or /invoices
           if ((subPath === '/invoice' || subPath === '/invoices') && method === 'POST') {
             if (!invoiceService) {
-              sendRfc7807(res, 501, 'Not Implemented', 'Invoice service is not configured', 'NOT_IMPLEMENTED');
+              sendRfc7807(
+                res,
+                501,
+                'Not Implemented',
+                'Invoice service is not configured',
+                'NOT_IMPLEMENTED',
+              );
               return;
             }
-            const body = ((await readJsonBody(req).catch(() => ({}))) as { taxRateBasisPoints?: number }) ?? {};
+            const body =
+              ((await readJsonBody(req).catch(() => ({}))) as { taxRateBasisPoints?: number }) ??
+              {};
             const result = await invoiceService.generateInvoice(storeId, orderId, body);
             sendJson(res, 201, {
               invoice: {
@@ -432,12 +440,24 @@ export function createOrderRoutes(options: OrderRoutesOptions): HttpRequestHandl
           // GET /api/v1/orders/:id/invoice or /invoices
           if ((subPath === '/invoice' || subPath === '/invoices') && method === 'GET') {
             if (!invoiceService) {
-              sendRfc7807(res, 501, 'Not Implemented', 'Invoice service is not configured', 'NOT_IMPLEMENTED');
+              sendRfc7807(
+                res,
+                501,
+                'Not Implemented',
+                'Invoice service is not configured',
+                'NOT_IMPLEMENTED',
+              );
               return;
             }
             const result = await invoiceService.getInvoiceByOrderId(storeId, orderId);
             if (!result) {
-              sendRfc7807(res, 404, 'Not Found', `No invoice found for order ${orderId}`, 'INVOICE_NOT_FOUND');
+              sendRfc7807(
+                res,
+                404,
+                'Not Found',
+                `No invoice found for order ${orderId}`,
+                'INVOICE_NOT_FOUND',
+              );
               return;
             }
             sendJson(res, 200, {

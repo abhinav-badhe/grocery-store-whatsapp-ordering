@@ -52,7 +52,9 @@ export function createOrderService(options?: OrderServiceOptions): HttpServerIns
     }
   }
 
-  const rawRouteHandler = orderService ? createOrderRoutes({ orderService, invoiceService }) : undefined;
+  const rawRouteHandler = orderService
+    ? createOrderRoutes({ orderService, invoiceService })
+    : undefined;
 
   const orderHandler =
     rawRouteHandler && options?.internalTokenSecret

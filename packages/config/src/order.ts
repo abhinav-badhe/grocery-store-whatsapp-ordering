@@ -1,4 +1,4 @@
-import { z } from 'zod';
+import type { z } from 'zod';
 import { CommonEnvSchema } from './common.js';
 import { DatabaseEnvSchema, InternalTokenEnvSchema } from './identity.js';
 import { loadConfig } from './loader.js';

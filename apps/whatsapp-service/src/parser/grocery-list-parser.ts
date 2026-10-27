@@ -1,11 +1,10 @@
-import {
+import type {
   ParsedGroceryItem,
-  ParsedGroceryItemSchema,
   GroceryListParseResult,
-  GroceryListParseResultSchema,
   ParseConfidence,
   CanonicalUnit,
 } from '@grocery/api-contracts';
+import { ParsedGroceryItemSchema, GroceryListParseResultSchema } from '@grocery/api-contracts';
 
 /**
  * Curated list of well-known grocery and FMCG brand names for deterministic recognition.

@@ -484,8 +484,7 @@ describe('Refresh Token Persistence & Rotation Foundation', () => {
       const newHash = hashRefreshToken('new-token-clamped');
       const familyExpiresAt = new Date(Date.now() + 3600000); // exactly 1 hour remaining in family lifetime
       const requestedExpiresAt = new Date(Date.now() + 7 * 86400000); // requesting 7 days
-      let capturedInsertExpiresAt: Date | null = null;
-      let capturedFamilyExpiresAt: Date | null = null;
+      let _capturedFamilyExpiresAt: Date | null = null;
 
       const mockDb = createMockKysely({
         onExecuteQuery: (sql, params) => {
@@ -515,7 +514,7 @@ describe('Refresh Token Persistence & Rotation Foundation', () => {
             for (const param of params) {
               if (param instanceof Date) {
                 if (param.getTime() === familyExpiresAt.getTime()) {
-                  capturedFamilyExpiresAt = param;
+                  _capturedFamilyExpiresAt = param;
                 }
               }
             }
