@@ -148,12 +148,15 @@ function resolveStoreId(req: IncomingMessage, url: URL): string | null {
   return null;
 }
 
+import type { InvoiceService } from './billing/invoice-service.js';
+
 export interface OrderRoutesOptions {
   readonly orderService: OrderService;
+  readonly invoiceService?: InvoiceService;
 }
 
 export function createOrderRoutes(options: OrderRoutesOptions): HttpRequestHandler {
-  const { orderService } = options;
+  const { orderService, invoiceService } = options;
 
   return async (req: IncomingMessage, res: ServerResponse, context?: RequestContext) => {
     const url = new URL(req.url ?? '/', `http://${req.headers.host ?? 'localhost'}`);
@@ -398,6 +401,59 @@ export function createOrderRoutes(options: OrderRoutesOptions): HttpRequestHandl
             );
 
             sendJson(res, 200, { order: toOrderDto(cancelled) });
+            return;
+          }
+
+          // POST /api/v1/orders/:id/invoice or /invoices
+          if ((subPath === '/invoice' || subPath === '/invoices') && method === 'POST') {
+            if (!invoiceService) {
+              sendRfc7807(res, 501, 'Not Implemented', 'Invoice service is not configured', 'NOT_IMPLEMENTED');
+              return;
+            }
+            const body = ((await readJsonBody(req).catch(() => ({}))) as { taxRateBasisPoints?: number }) ?? {};
+            const result = await invoiceService.generateInvoice(storeId, orderId, body);
+            sendJson(res, 201, {
+              invoice: {
+                ...result.invoice,
+                subtotalMinor: result.invoice.subtotalMinor.toString(),
+                taxTotalMinor: result.invoice.taxTotalMinor.toString(),
+                grandTotalMinor: result.invoice.grandTotalMinor.toString(),
+              },
+              lines: result.lines.map((l) => ({
+                ...l,
+                unitPriceMinorSnapshot: l.unitPriceMinorSnapshot.toString(),
+                taxAmountMinor: l.taxAmountMinor.toString(),
+                lineTotalMinor: l.lineTotalMinor.toString(),
+              })),
+            });
+            return;
+          }
+
+          // GET /api/v1/orders/:id/invoice or /invoices
+          if ((subPath === '/invoice' || subPath === '/invoices') && method === 'GET') {
+            if (!invoiceService) {
+              sendRfc7807(res, 501, 'Not Implemented', 'Invoice service is not configured', 'NOT_IMPLEMENTED');
+              return;
+            }
+            const result = await invoiceService.getInvoiceByOrderId(storeId, orderId);
+            if (!result) {
+              sendRfc7807(res, 404, 'Not Found', `No invoice found for order ${orderId}`, 'INVOICE_NOT_FOUND');
+              return;
+            }
+            sendJson(res, 200, {
+              invoice: {
+                ...result.invoice,
+                subtotalMinor: result.invoice.subtotalMinor.toString(),
+                taxTotalMinor: result.invoice.taxTotalMinor.toString(),
+                grandTotalMinor: result.invoice.grandTotalMinor.toString(),
+              },
+              lines: result.lines.map((l) => ({
+                ...l,
+                unitPriceMinorSnapshot: l.unitPriceMinorSnapshot.toString(),
+                taxAmountMinor: l.taxAmountMinor.toString(),
+                lineTotalMinor: l.lineTotalMinor.toString(),
+              })),
+            });
             return;
           }
         }

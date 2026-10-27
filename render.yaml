@@ -1,0 +1,210 @@
+# Render Infrastructure Blueprint
+# Conforms to ADR-001, ADR-002, and ADR-008
+# Topology: 1 Public Web Service (Gateway), 5 Private Services, 3 Background Workers, 1 Postgres DB
+
+databases:
+  - name: grocery-postgres
+    databaseName: grocery_db
+    user: grocery_admin
+    plan: starter
+    postgresMajorVersion: 16
+    region: frankfurt
+
+services:
+  # 1. Public API Gateway (Web Service - Public Ingress)
+  - type: web
+    name: api-gateway
+    env: node
+    plan: starter
+    region: frankfurt
+    buildCommand: pnpm install && pnpm build
+    startCommand: node apps/api-gateway/dist/index.js
+    healthCheckPath: /health/live
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 10000
+      - key: CORS_ALLOWED_ORIGINS
+        value: https://store.grocery.local,https://admin.grocery.local
+      - key: INTERNAL_TOKEN_SECRET
+        generateValue: true
+      - key: IDENTITY_SERVICE_URL
+        value: http://identity-service:10001
+      - key: CATALOG_SERVICE_URL
+        value: http://catalog-service:10002
+      - key: INVENTORY_SERVICE_URL
+        value: http://inventory-service:10003
+      - key: ORDER_SERVICE_URL
+        value: http://order-service:10004
+      - key: PAYMENT_SERVICE_URL
+        value: http://payment-service:10005
+
+  # 2. Identity Service (Private Service)
+  - type: pserv
+    name: identity-service
+    env: node
+    plan: starter
+    region: frankfurt
+    buildCommand: pnpm install && pnpm build
+    startCommand: node apps/identity-service/dist/index.js
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 10001
+      - key: DATABASE_URL
+        fromDatabase:
+          name: grocery-postgres
+          property: connectionString
+      - key: INTERNAL_TOKEN_SECRET
+        fromService:
+          name: api-gateway
+          type: web
+          envVarKey: INTERNAL_TOKEN_SECRET
+
+  # 3. Catalog Service (Private Service)
+  - type: pserv
+    name: catalog-service
+    env: node
+    plan: starter
+    region: frankfurt
+    buildCommand: pnpm install && pnpm build
+    startCommand: node apps/catalog-service/dist/index.js
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 10002
+      - key: DATABASE_URL
+        fromDatabase:
+          name: grocery-postgres
+          property: connectionString
+      - key: INTERNAL_TOKEN_SECRET
+        fromService:
+          name: api-gateway
+          type: web
+          envVarKey: INTERNAL_TOKEN_SECRET
+
+  # 4. Inventory Service (Private Service)
+  - type: pserv
+    name: inventory-service
+    env: node
+    plan: starter
+    region: frankfurt
+    buildCommand: pnpm install && pnpm build
+    startCommand: node apps/inventory-service/dist/index.js
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 10003
+      - key: DATABASE_URL
+        fromDatabase:
+          name: grocery-postgres
+          property: connectionString
+      - key: INTERNAL_TOKEN_SECRET
+        fromService:
+          name: api-gateway
+          type: web
+          envVarKey: INTERNAL_TOKEN_SECRET
+
+  # 5. Order & Billing Service (Private Service - includes co-located Billing module per ADR-001)
+  - type: pserv
+    name: order-service
+    env: node
+    plan: starter
+    region: frankfurt
+    buildCommand: pnpm install && pnpm build
+    startCommand: node apps/order-service/dist/index.js
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 10004
+      - key: DATABASE_URL
+        fromDatabase:
+          name: grocery-postgres
+          property: connectionString
+      - key: INVENTORY_SERVICE_URL
+        value: http://inventory-service:10003
+      - key: CATALOG_SERVICE_URL
+        value: http://catalog-service:10002
+      - key: INTERNAL_TOKEN_SECRET
+        fromService:
+          name: api-gateway
+          type: web
+          envVarKey: INTERNAL_TOKEN_SECRET
+
+  # 6. Payment Service (Private Service)
+  - type: pserv
+    name: payment-service
+    env: node
+    plan: starter
+    region: frankfurt
+    buildCommand: pnpm install && pnpm build
+    startCommand: node apps/payment-service/dist/index.js
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 10005
+      - key: DATABASE_URL
+        fromDatabase:
+          name: grocery-postgres
+          property: connectionString
+      - key: ORDER_SERVICE_URL
+        value: http://order-service:10004
+      - key: INTERNAL_TOKEN_SECRET
+        fromService:
+          name: api-gateway
+          type: web
+          envVarKey: INTERNAL_TOKEN_SECRET
+
+  # 7. Notification Worker (Background Worker - Consumes queue, calls WhatsApp Cloud API)
+  - type: worker
+    name: notification-worker
+    env: node
+    plan: starter
+    region: frankfurt
+    buildCommand: pnpm install && pnpm build
+    startCommand: node apps/notification-worker/dist/index.js
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        fromDatabase:
+          name: grocery-postgres
+          property: connectionString
+
+  # 8. Reporting Worker (Background Worker - Updates materialized views and metrics)
+  - type: worker
+    name: reporting-worker
+    env: node
+    plan: starter
+    region: frankfurt
+    buildCommand: pnpm install && pnpm build
+    startCommand: node apps/reporting-worker/dist/index.js
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        fromDatabase:
+          name: grocery-postgres
+          property: connectionString
+
+  # 9. Reconciliation Worker (Background Worker - Polls payment timeouts and outbox)
+  - type: worker
+    name: reconciliation-worker
+    env: node
+    plan: starter
+    region: frankfurt
+    buildCommand: pnpm install && pnpm build
+    startCommand: node apps/reconciliation-worker/dist/index.js
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        fromDatabase:
+          name: grocery-postgres
+          property: connectionString

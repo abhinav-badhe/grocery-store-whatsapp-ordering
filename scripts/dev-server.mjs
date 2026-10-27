@@ -13,6 +13,7 @@ import {
   createOrderService,
   createOrderServiceInstance,
   HttpInventoryClient,
+  InvoiceService,
 } from '../apps/order-service/dist/index.js';
 import {
   createPaymentService,
@@ -238,7 +239,7 @@ const payments = new Map();
 const webhooks = new Map();
 const sentWhatsAppMessages = [];
 
-// Seed initial demo order
+// Seed initial demo orders matching storefront and admin console
 const initialOrderId = '00000000-0000-4000-8000-000000000101';
 orders.set(initialOrderId, {
   id: initialOrderId,
@@ -257,16 +258,151 @@ orders.set(initialOrderId, {
       order_id: initialOrderId,
       product_id: STOREFRONT_PRODUCT_IDS.apple,
       product_name: 'Fresh Fuji Apples',
+      product_name_snapshot: 'Fresh Fuji Apples',
       sku: 'APPL-01',
+      sku_snapshot: 'APPL-01',
       unit: 'KG',
+      unit_snapshot: 'KG',
       quantity: 2,
       unit_price_cents: 14000,
       total_price_cents: 28000,
+      status: 'CONFIRMED',
     },
   ],
   created_at: new Date(),
   updated_at: new Date(),
 });
+
+// Seed console orders (ORD-7821, ORD-7820, ORD-7819)
+const consoleOrders = [
+  {
+    id: '00000000-0000-4000-8000-000000001001',
+    store_id: STORE_ID,
+    order_number: 'ORD-7821',
+    customer_phone: '+919820123456',
+    customer_name: 'Aarav Mehta',
+    status: 'AWAITING_SHOPKEEPER_REVIEW',
+    fulfillment_type: 'DELIVERY',
+    delivery_address: 'Flat 402, Green Valley Apartments, Hill Road, Bandra West',
+    total_amount_cents: 32350,
+    currency: 'INR',
+    items: [
+      {
+        id: '00000000-0000-4000-8000-000000000101',
+        order_id: '00000000-0000-4000-8000-000000001001',
+        product_id: STOREFRONT_PRODUCT_IDS.apple,
+        product_name: 'Fresh Fuji Apples',
+        product_name_snapshot: 'Fresh Fuji Apples',
+        sku: 'APPL-01',
+        sku_snapshot: 'APPL-01',
+        unit: 'KG',
+        unit_snapshot: 'KG',
+        quantity: 1,
+        unit_price_cents: 14000,
+        total_price_cents: 14000,
+        status: 'CONFIRMED',
+      },
+      {
+        id: '00000000-0000-4000-8000-000000000102',
+        order_id: '00000000-0000-4000-8000-000000001001',
+        product_id: STOREFRONT_PRODUCT_IDS.milk,
+        product_name: 'Organic Whole Milk 1L',
+        product_name_snapshot: 'Organic Whole Milk 1L',
+        sku: 'MILK-01',
+        sku_snapshot: 'MILK-01',
+        unit: 'LITRE',
+        unit_snapshot: 'LITRE',
+        quantity: 2,
+        unit_price_cents: 6500,
+        total_price_cents: 13000,
+        status: 'CONFIRMED',
+      },
+    ],
+    created_at: new Date(),
+    updated_at: new Date(),
+  },
+  {
+    id: '00000000-0000-4000-8000-000000001002',
+    store_id: STORE_ID,
+    order_number: 'ORD-7820',
+    customer_phone: '+919819876543',
+    customer_name: 'Neha Sharma',
+    status: 'CONFIRMED',
+    fulfillment_type: 'DELIVERY',
+    delivery_address: 'Bungalow 7, Perry Cross Road, Bandra West',
+    total_amount_cents: 59850,
+    currency: 'INR',
+    items: [
+      {
+        id: '00000000-0000-4000-8000-000000000103',
+        order_id: '00000000-0000-4000-8000-000000001002',
+        product_id: STOREFRONT_PRODUCT_IDS.rice,
+        product_name: 'Daawat Rozana Basmati Rice 5kg',
+        product_name_snapshot: 'Daawat Rozana Basmati Rice 5kg',
+        sku: 'RICE-01',
+        sku_snapshot: 'RICE-01',
+        unit: 'PACK',
+        unit_snapshot: 'PACK',
+        quantity: 1,
+        unit_price_cents: 36000,
+        total_price_cents: 36000,
+        status: 'CONFIRMED',
+      },
+      {
+        id: '00000000-0000-4000-8000-000000000104',
+        order_id: '00000000-0000-4000-8000-000000001002',
+        product_id: STOREFRONT_PRODUCT_IDS.butter,
+        product_name: 'Cultured Farmhouse Butter 500g',
+        product_name_snapshot: 'Cultured Farmhouse Butter 500g',
+        sku: 'BUTE-01',
+        sku_snapshot: 'BUTE-01',
+        unit: 'PACK',
+        unit_snapshot: 'PACK',
+        quantity: 1,
+        unit_price_cents: 26500,
+        total_price_cents: 26500,
+        status: 'CONFIRMED',
+      },
+    ],
+    created_at: new Date(Date.now() - 3600000),
+    updated_at: new Date(Date.now() - 3600000),
+  },
+  {
+    id: '00000000-0000-4000-8000-000000001003',
+    store_id: STORE_ID,
+    order_number: 'ORD-7819',
+    customer_phone: '+919870098765',
+    customer_name: 'Kunal Kapoor',
+    status: 'PREPARING',
+    fulfillment_type: 'PICKUP',
+    delivery_address: null,
+    total_amount_cents: 136500,
+    currency: 'INR',
+    items: [
+      {
+        id: '00000000-0000-4000-8000-000000000105',
+        order_id: '00000000-0000-4000-8000-000000001003',
+        product_id: STOREFRONT_PRODUCT_IDS.coffee,
+        product_name: 'Single-Origin Arabica Beans 250g',
+        product_name_snapshot: 'Single-Origin Arabica Beans 250g',
+        sku: 'COFF-01',
+        sku_snapshot: 'COFF-01',
+        unit: 'PACK',
+        unit_snapshot: 'PACK',
+        quantity: 1,
+        unit_price_cents: 42000,
+        total_price_cents: 42000,
+        status: 'CONFIRMED',
+      },
+    ],
+    created_at: new Date(Date.now() - 7200000),
+    updated_at: new Date(Date.now() - 7200000),
+  },
+];
+
+for (const o of consoleOrders) {
+  orders.set(o.id, o);
+}
 
 // Mock Repositories
 const mockCategoryRepo = {
@@ -724,9 +860,11 @@ const orderServiceInstance = createOrderServiceInstance(
   orderInventoryClient,
   orderCatalogClient,
 );
+const invoiceServiceInstance = new InvoiceService({ orderRepository: mockOrderRepo });
 const orderServer = createOrderService({
   port: ORDER_PORT,
   orderService: orderServiceInstance,
+  invoiceService: invoiceServiceInstance,
   internalTokenSecret: INTERNAL_SECRET,
 });
 await orderServer.start();

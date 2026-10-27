@@ -4,6 +4,8 @@ import type { NotificationChannelAdapter, NotificationMessage } from '../channel
 import { WhatsAppChannelAdapter } from '../channels/whatsapp-adapter.js';
 import { SmsChannelAdapter } from '../channels/sms-adapter.js';
 
+import { InMemoryInboxRepository, type InboxRepositoryPort } from '../persistence/inbox-repository.js';
+
 export interface DispatcherResult {
   readonly processed: number;
   readonly failed: number;
@@ -17,6 +19,7 @@ export class NotificationDispatcher {
     private readonly outboxRepo: OutboxRepository,
     private readonly logRepo: NotificationLogRepository,
     adapters?: readonly NotificationChannelAdapter[],
+    private readonly inboxRepo: InboxRepositoryPort = new InMemoryInboxRepository(),
   ) {
     this.adapters = new Map();
     if (adapters && adapters.length > 0) {
@@ -44,6 +47,14 @@ export class NotificationDispatcher {
 
     for (const event of events) {
       try {
+        // ADR-009 Consumer Inbox Deduplication:
+        const isNew = await this.inboxRepo.recordProcessed(event.id, 'notification-worker');
+        if (!isNew) {
+          await this.outboxRepo.markPublished(event.id);
+          processed++;
+          continue;
+        }
+
         const messages = this.mapEventToNotifications(event);
 
         let eventSuccess = true;

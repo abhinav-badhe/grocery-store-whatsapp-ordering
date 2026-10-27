@@ -6,6 +6,7 @@ export interface ServiceUrls {
   readonly inventory: string;
   readonly order: string;
   readonly payment: string;
+  readonly whatsapp?: string;
 }
 
 export interface ApiGatewayConfig {

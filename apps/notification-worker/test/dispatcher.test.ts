@@ -217,4 +217,41 @@ describe('Notification Dispatcher Engine & Delivery Tracking', () => {
     const statusStopped = worker.getStatus();
     assert.equal(statusStopped.status, 'stopped');
   });
+
+  it('deduplicates redelivered events via consumer inbox without duplicate dispatch (ADR-009)', async () => {
+    let sendCount = 0;
+    const mockOutboxRepo: OutboxRepository = {
+      insertEvent: async () => ({}) as OutboxRow,
+      fetchPending: async () => [createMockEvent()],
+      markProcessing: async () => {},
+      markPublished: async () => {},
+      markFailed: async () => {},
+      markDeadLetter: async () => {},
+    };
+    const mockLogRepo: NotificationLogRepository = {
+      createLog: async () => ({}) as NotificationLogRow,
+      updateStatus: async () => {},
+      listByRecipient: async () => [],
+    };
+    const mockAdapter: NotificationChannelAdapter = {
+      channel: 'WHATSAPP',
+      send: async () => {
+        sendCount++;
+        return { success: true, providerMessageId: 'msg-1' };
+      },
+    };
+
+    const dispatcher = createNotificationDispatcher(mockOutboxRepo, mockLogRepo, [mockAdapter]);
+
+    // First delivery
+    const result1 = await dispatcher.processPendingBatch(10);
+    assert.equal(result1.processed, 1);
+    assert.equal(sendCount, 1);
+
+    // Duplicate redelivery of the same event
+    const result2 = await dispatcher.processPendingBatch(10);
+    assert.equal(result2.processed, 1);
+    // Send count must still be 1 (zero duplicate dispatch)
+    assert.equal(sendCount, 1);
+  });
 });

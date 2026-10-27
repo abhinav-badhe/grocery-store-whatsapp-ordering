@@ -18,14 +18,17 @@ import {
 } from './service/index.js';
 import { createOrderRoutes } from './routes.js';
 import { HttpInventoryClient, type HttpInventoryClientOptions } from './client/inventory-client.js';
+import { InvoiceService } from './billing/invoice-service.js';
 
 export * from './persistence/index.js';
 export * from './service/index.js';
 export * from './routes.js';
 export * from './client/inventory-client.js';
+export * from './billing/index.js';
 
 export interface OrderServiceOptions extends Partial<HttpServerOptions> {
   readonly orderService?: OrderService;
+  readonly invoiceService?: InvoiceService;
   readonly db?: Kysely<Database>;
   readonly inventoryClient?: InventoryClient;
   readonly catalogClient?: CatalogLookupClient;
@@ -36,6 +39,7 @@ export interface OrderServiceOptions extends Partial<HttpServerOptions> {
 
 export function createOrderService(options?: OrderServiceOptions): HttpServerInstance {
   let orderService = options?.orderService;
+  let invoiceService = options?.invoiceService;
   if (!orderService && options?.db) {
     const orderRepo = createOrderRepository(options.db);
     orderService = createOrderServiceInstance(
@@ -43,9 +47,12 @@ export function createOrderService(options?: OrderServiceOptions): HttpServerIns
       options.inventoryClient,
       options.catalogClient,
     );
+    if (!invoiceService) {
+      invoiceService = new InvoiceService({ orderRepository: orderRepo });
+    }
   }
 
-  const rawRouteHandler = orderService ? createOrderRoutes({ orderService }) : undefined;
+  const rawRouteHandler = orderService ? createOrderRoutes({ orderService, invoiceService }) : undefined;
 
   const orderHandler =
     rawRouteHandler && options?.internalTokenSecret
